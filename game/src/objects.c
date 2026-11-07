@@ -2697,6 +2697,14 @@ static s32 mdkr_objmap_probe_enabled(void) {
  * struct may simply not be present in this level's record, and swapping past the
  * stride would corrupt the *next* entry. Never widen it. */
 static void mdkr_objmap_swap_u16(s32 behaviorId, u8 *e, s32 off, s32 stride) {
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+    /* Big-endian host (Wii U): the ROM bytes are already in host order. */
+    (void) behaviorId;
+    (void) e;
+    (void) off;
+    (void) stride;
+    return;
+#endif
     if (off + 2 <= stride) {
         u8 t = e[off];
         u16 before;
@@ -15234,6 +15242,13 @@ void dkr_misc_swap_words(s32 index) {
     if (!dkr_misc_swap_claim(index, &wstart, &wend)) {
         return;
     }
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+    /* Big-endian host (Wii U): the ROM bytes are already in host order. The
+     * claim above still marks the table as normalized. */
+    (void) base;
+    (void) w;
+    return;
+#endif
     base = (u32 *) gAssetsMiscSection;
     for (w = wstart; w < wend; w++) {
         u32 v = base[w];
@@ -15257,6 +15272,11 @@ void dkr_misc_swap_halfwords(s32 index) {
     if (!dkr_misc_swap_claim(index, &wstart, &wend)) {
         return;
     }
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+    (void) base;
+    (void) h;
+    return; /* big-endian host: already in host order */
+#endif
     base = (u16 *) gAssetsMiscSection;
     for (h = wstart * 2; h < wend * 2; h++) { /* s32-word range -> halfword range */
         u16 v = base[h];
@@ -15365,6 +15385,9 @@ static void dkr_misc_swap_shield_records(void) {
                 (int) n, (int) DKR_SHIELD_ENTRIES, (int) NUMBER_OF_PLAYER_VEHICLES, (int) NUMBER_OF_CHARACTERS);
         abort();
     }
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+    return; /* big-endian host: already in host order */
+#endif
     for (i = 0; i < n; i++) {
         u8 *rec = base + (i * DKR_SHIELD_ROM_STRIDE);
         s32 k;

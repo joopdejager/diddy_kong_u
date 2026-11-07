@@ -44,6 +44,7 @@
 #include "gfx_cc.h"
 #include "gfx_rendering_api.h"
 #include "gx2_shader_gen.h"
+#include "gx2_vertex_map.h"
 #include "wiiu_gfx.h"
 
 #define ALIGN_UP(x, a) (((x) + ((a) - 1)) & ~((a) - 1))
@@ -56,15 +57,6 @@
  * the CPU has moved on, so it is only reset once a frame has been presented. */
 #define DRAW_BUFFER_SIZE (24u * 1024u * 1024u)
 
-/* Up to 4 (pos) + 2*4 (tex) + 4 (fog) + 7*4 (inputs) floats per vertex. */
-#define MAX_DST_FLOATS 48
-
-struct CopyRun {
-    uint8_t src;   /* offset in the source vertex, in floats */
-    uint8_t dst;   /* offset in the repacked vertex, in floats */
-    uint8_t count; /* floats to copy */
-};
-
 struct ShaderProgram {
     uint64_t id0;
     uint32_t id1;
@@ -75,14 +67,7 @@ struct ShaderProgram {
     uint32_t window_params_offset;
     int32_t sampler_location[2];
 
-    uint32_t src_floats; /* floats per vertex as packed by the front end */
-    uint32_t dst_floats; /* floats per vertex as read by the shader */
-    uint8_t num_runs;
-    struct CopyRun runs[24];
-    /* Slots that must be filled with a constant because the source had no
-     * value for them (e.g. the alpha of a 3-component combiner input). */
-    uint8_t num_ones;
-    uint8_t ones[8];
+    struct Gx2VertexMap map;
 
     struct ShaderProgram *next;
 };
@@ -145,80 +130,6 @@ static uint32_t uniform_offset(const GX2PixelShader *shader, const char *name) {
         }
     }
     return 0;
-}
-
-static void add_run(struct ShaderProgram *prg, uint32_t src, uint32_t dst, uint32_t count) {
-    if (count == 0) {
-        return;
-    }
-    if (prg->num_runs > 0) {
-        struct CopyRun *last = &prg->runs[prg->num_runs - 1];
-        if (last->src + last->count == src && last->dst + last->count == dst) {
-            last->count += count;
-            return;
-        }
-    }
-    if (prg->num_runs < sizeof(prg->runs) / sizeof(prg->runs[0])) {
-        prg->runs[prg->num_runs].src = (uint8_t)src;
-        prg->runs[prg->num_runs].dst = (uint8_t)dst;
-        prg->runs[prg->num_runs].count = (uint8_t)count;
-        prg->num_runs++;
-    }
-}
-
-/* Work out how a vertex packed by the front end (in gfx_opengl.c's order)
- * maps onto the shader's fixed 4-float slots:
- *   pos, [tex0: s t clampS clampT], [tex1], [fog rgba], inputs (rgba each). */
-static void build_vertex_map(struct ShaderProgram *prg, const struct CCFeatures *cc) {
-    uint32_t src = 0;
-    uint32_t dst = 0;
-
-    add_run(prg, src, dst, 4); /* position */
-    src += 4;
-    dst += 4;
-
-    if (cc->opt_alpha && cc->diag_rdp_cvg_memory_blend) {
-        src += 6; /* coverage-memory diagnostics, unused here */
-    }
-    if (cc->opt_world_pos) {
-        src += 3;
-    }
-    if (cc->opt_dfdx_light) {
-        src += 6;
-    }
-    for (int i = 0; i < 2; i++) {
-        if (!cc->used_textures[i]) {
-            continue;
-        }
-        add_run(prg, src, dst, 2); /* s, t */
-        src += 2;
-        for (int axis = 0; axis < 2; axis++) {
-            if (cc->clamp[i][axis]) {
-                add_run(prg, src, dst + 2 + axis, 1);
-                src += 1;
-            }
-            if (cc->tile_mask[i][axis]) {
-                src += 1; /* shader-side mask wrap is not implemented on GX2 */
-            }
-        }
-        dst += 4;
-    }
-    if (cc->opt_fog) {
-        add_run(prg, src, dst, 4);
-        src += 4;
-        dst += 4;
-    }
-    for (int i = 0; i < cc->num_inputs; i++) {
-        uint32_t n = cc->opt_alpha ? 4 : 3;
-        add_run(prg, src, dst, n);
-        if (n == 3 && prg->num_ones < sizeof(prg->ones)) {
-            prg->ones[prg->num_ones++] = (uint8_t)(dst + 3);
-        }
-        src += n;
-        dst += 4;
-    }
-    prg->src_floats = src;
-    prg->dst_floats = dst;
 }
 
 /* ----------------------------------------------------------------------- */
@@ -295,7 +206,7 @@ static struct ShaderProgram *gfx_gx2_create_and_load_new_shader(uint64_t shader_
     prg->num_inputs = (uint8_t)cc.num_inputs;
     prg->used_textures[0] = cc.used_textures[0];
     prg->used_textures[1] = cc.used_textures[1];
-    build_vertex_map(prg, &cc);
+    gx2_vertex_map_build(&prg->map, &cc);
 
     if (gx2GenerateShaderGroup(&prg->group, &cc) == 0) {
         prg->valid = true;
@@ -558,18 +469,18 @@ static void gfx_gx2_draw_triangles(float buf_vbo[], size_t buf_vbo_len, size_t b
     float *dst;
 
     if (!s_frameActive || prg == NULL || !prg->valid || buf_vbo_num_tris == 0 ||
-        prg->src_floats == 0) {
+        prg->map.src_floats == 0) {
         return;
     }
     vertices = (uint32_t)(buf_vbo_num_tris * 3u);
-    if ((size_t)vertices * prg->src_floats > buf_vbo_len) {
-        vertices = (uint32_t)(buf_vbo_len / prg->src_floats);
+    if ((size_t)vertices * prg->map.src_floats > buf_vbo_len) {
+        vertices = (uint32_t)(buf_vbo_len / prg->map.src_floats);
         vertices -= vertices % 3u;
         if (vertices == 0) {
             return;
         }
     }
-    bytes = vertices * prg->dst_floats * sizeof(float);
+    bytes = vertices * prg->map.dst_floats * sizeof(float);
     if (s_drawOffset + bytes > DRAW_BUFFER_SIZE) {
         /* Out of room this frame: let the GPU finish so the ring can wrap. */
         GX2DrawDone();
@@ -585,21 +496,21 @@ static void gfx_gx2_draw_triangles(float buf_vbo[], size_t buf_vbo_len, size_t b
         const float *src = buf_vbo;
         float *out = dst;
         for (uint32_t v = 0; v < vertices; v++) {
-            memset(out, 0, prg->dst_floats * sizeof(float));
-            for (uint32_t r = 0; r < prg->num_runs; r++) {
-                const struct CopyRun *run = &prg->runs[r];
+            memset(out, 0, prg->map.dst_floats * sizeof(float));
+            for (uint32_t r = 0; r < prg->map.num_runs; r++) {
+                const struct Gx2CopyRun *run = &prg->map.runs[r];
                 memcpy(out + run->dst, src + run->src, run->count * sizeof(float));
             }
-            for (uint32_t o = 0; o < prg->num_ones; o++) {
-                out[prg->ones[o]] = 1.0f;
+            for (uint32_t o = 0; o < prg->map.num_ones; o++) {
+                out[prg->map.ones[o]] = 1.0f;
             }
-            src += prg->src_floats;
-            out += prg->dst_floats;
+            src += prg->map.src_floats;
+            out += prg->map.dst_floats;
         }
     }
 
     GX2Invalidate(GX2_INVALIDATE_MODE_CPU_ATTRIBUTE_BUFFER, dst, bytes);
-    GX2SetAttribBuffer(0, bytes, prg->dst_floats * sizeof(float), dst);
+    GX2SetAttribBuffer(0, bytes, prg->map.dst_floats * sizeof(float), dst);
     GX2DrawEx(GX2_PRIMITIVE_MODE_TRIANGLES, vertices, 0, 1);
 }
 

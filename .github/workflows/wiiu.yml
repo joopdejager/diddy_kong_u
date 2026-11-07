@@ -1,0 +1,41 @@
+name: Wii U build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  wiiu:
+    runs-on: ubuntu-latest
+    container: devkitpro/devkitppc:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -DCMAKE_TOOLCHAIN_FILE="$DEVKITPRO/cmake/WiiU.cmake" -DCMAKE_BUILD_TYPE=Release -Bbuild-wiiu .
+      - name: Build
+        run: cmake --build build-wiiu -j"$(nproc)"
+      - name: Package
+        run: |
+          mkdir -p out/wiiu/apps/dkr
+          cp build-wiiu/mdkr64.wuhb out/wiiu/apps/dkr.wuhb
+          echo "Put your Diddy Kong Racing ROM here as dkr.z64" > out/wiiu/apps/dkr/put_your_rom_here.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dkr-wiiu
+          path: out/
+
+  big-endian-build:
+    # Builds the big-endian PowerPC Linux test program (no ROM in CI, so it is
+    # only compiled and started, not run through a race).
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cross compiler and qemu
+        run: sudo apt-get update && sudo apt-get install -y gcc-powerpc-linux-gnu qemu-user libsdl2-dev cmake
+      - name: Build and start
+        run: |
+          set +e
+          tools/wiiu/be-test.sh /dev/null 1 > be.log 2>&1
+          cat be.log | tail -5
+          grep -q "Could not load ROM" be.log

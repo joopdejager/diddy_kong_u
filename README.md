@@ -1,3 +1,21 @@
+# Diddy Kong Racing for Wii U
+
+A native **Wii U** build of Diddy Kong Racing, based on the
+[Golden Balloon](https://github.com/akratch/goldenballoon) source port of the
+[DavidSM64 decompilation](https://github.com/DavidSM64/Diddy-Kong-Racing).
+The game's C code is compiled for the Wii U's PowerPC CPU and draws through
+GX2; there is no emulator. Bring your own ROM (US 1.1 or EU 1.1).
+
+- Install: copy `mdkr64.wuhb` to `sd:/wiiu/apps/` and your ROM to
+  `sd:/wiiu/apps/dkr/dkr.z64`, then start it from the Wii U Menu (Aroma).
+- Build: `tools/wiiu/build-wiiu.sh` (Docker), output `build-wiiu/mdkr64.wuhb`.
+  CI builds it on every push (artifact `dkr-wiiu`).
+- Status, design notes and testing: [docs/wiiu/README.md](docs/wiiu/README.md).
+
+The rest of this file is Golden Balloon's own README, kept for reference.
+
+---
+
 <p align="center">
   <img src="dist/web/assets/hero.jpg" alt="Golden Balloon" width="820">
 </p>

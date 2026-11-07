@@ -1764,6 +1764,15 @@ static inline void *dkr_resolve(uint32_t addr) {
     if (addr != 0 && addr < 0x01000000u) {
         return dkr_retain_resolved_pointer((void *)(uintptr_t)addr);
     }
+#if !defined(__EMSCRIPTEN__)
+    /* Native ILP32 (Wii U, and its PowerPC Linux test build): the program's
+     * data and heap sit at 0x10000000 and above, not near 0 as in wasm. N64
+     * segment tokens never reach 0x10000000, so a raw token at or above it is
+     * a host pointer (e.g. gSPDisplayList(dRspInit) with a raw address). */
+    if (addr >= 0x10000000u) {
+        return dkr_retain_resolved_pointer((void *)(uintptr_t)addr);
+    }
+#endif
 #endif
     r = gfx_resolve_segment_addr_bounded(
         addr, (uintptr_t)g_dkrArenaBase, (size_t)g_dkrArenaSize);

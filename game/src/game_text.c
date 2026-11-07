@@ -484,6 +484,9 @@ void set_current_text(s32 textID) {
          * flags/offset masks below read them. */
         {
             s32 mdkrI;
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+            if (0) /* big-endian host: already in host order */
+#endif
             for (mdkrI = 0; mdkrI < 4; mdkrI++) {
                 u32 v = entries[mdkrI];
                 entries[mdkrI] = ((v & 0xFFu) << 24) | ((v & 0xFF00u) << 8) | ((v >> 8) & 0xFF00u) | ((v >> 24) & 0xFFu);

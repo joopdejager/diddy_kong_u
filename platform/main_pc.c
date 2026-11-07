@@ -164,7 +164,9 @@ extern void camera_obstruction_runtime_install_config_apply(void);
  * (platform/fast3d/gfx_opengl.c). Forward-declared opaquely to avoid pulling the
  * full fast3d/PR headers into the entry point. */
 struct GfxRenderingAPI;
-#ifdef __WIIU__
+#if defined(MDKR_NULL_RENDERER)
+extern struct GfxRenderingAPI gfx_null_api;     /* platform/wiiu/betest/gfx_null.c */
+#elif defined(__WIIU__)
 extern struct GfxRenderingAPI gfx_gx2_api;      /* platform/wiiu/gfx_gx2.c */
 #elif !defined(__EMSCRIPTEN__)
 extern struct GfxRenderingAPI gfx_opengl_api;   /* GL backend — desktop only */
@@ -492,6 +494,8 @@ int main(int argc, char **argv) {
 #ifdef __EMSCRIPTEN__
     /* Web is WebGPU-only (no GL backend compiled in the wasm binary). */
     struct GfxRenderingAPI *rapi = &gfx_webgpu_api;
+#elif defined(MDKR_NULL_RENDERER)
+    struct GfxRenderingAPI *rapi = &gfx_null_api;
 #elif defined(__WIIU__)
     struct GfxRenderingAPI *rapi = &gfx_gx2_api;
 #else

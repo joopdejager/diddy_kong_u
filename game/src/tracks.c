@@ -6102,6 +6102,9 @@ void generate_track(s32 modelId) {
     {
         s32 bspNodeCount = gCurrentLevelModel->numberOfSegments - 1;
         BspTreeNode *bsp = DKR_PTR(BspTreeNode, gCurrentLevelModel->segmentsBspTree);
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+        bspNodeCount = 0; /* big-endian host: already in host order */
+#endif
         for (k = 0; k < bspNodeCount; k++) {
             bsp[k].leftNode   = (s16) (((u16) bsp[k].leftNode   << 8) | ((u16) bsp[k].leftNode   >> 8));
             bsp[k].rightNode  = (s16) (((u16) bsp[k].rightNode  << 8) | ((u16) bsp[k].rightNode  >> 8));

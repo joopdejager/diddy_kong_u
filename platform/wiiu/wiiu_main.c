@@ -39,6 +39,7 @@
 #define GAME_STACK_SIZE (8 * 1024 * 1024)
 
 int mdkr64_wiiu_main(int argc, char **argv);
+void wiiu_crash_install(void);
 
 static const char *const kRomNames[] = {
     "dkr.z64", "dkr.n64", "dkr.v64",
@@ -47,7 +48,7 @@ static const char *const kRomNames[] = {
 
 static char s_romPath[512];
 static int s_argc;
-static char *s_argv[8];
+static char *s_argv[12];
 static int s_result;
 
 static void make_dirs(const char *path) {
@@ -116,6 +117,7 @@ int main(int argc, char **argv) {
     setvbuf(stdout, NULL, _IOLBF, 0);
     setvbuf(stderr, NULL, _IONBF, 0);
     printf("[wiiu] Diddy Kong Racing for Wii U starting\n");
+    wiiu_crash_install();
 
     if (!find_rom()) {
         static const char *const lines[] = {
@@ -143,6 +145,13 @@ int main(int argc, char **argv) {
     s_argv[s_argc++] = (char *)"mdkr64";
     s_argv[s_argc++] = (char *)"--rom";
     s_argv[s_argc++] = s_romPath;
+    /* The GX2 back end draws straight into a 1280x720 framebuffer: no
+     * supersampling (the desktop default renders at 2x and scales down) and
+     * no MSAA. */
+    s_argv[s_argc++] = (char *)"--video-set";
+    s_argv[s_argc++] = (char *)"Video.RenderScale=1";
+    s_argv[s_argc++] = (char *)"--video-set";
+    s_argv[s_argc++] = (char *)"Video.MSAA=0";
     s_argv[s_argc] = NULL;
 
     stack = memalign(64, GAME_STACK_SIZE);

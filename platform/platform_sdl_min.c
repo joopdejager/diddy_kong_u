@@ -179,8 +179,8 @@ uint64_t platform_perf_monotonic_ns(void) {
 #include "sprite_models.h"
 #include "mdkr_bounds.h"
 #include "gfx_ptr.h"
-#ifdef __WIIU__
-#include "wiiu_gfx.h"             /* GX2 screen + ProcUI (HOME menu) */
+#if defined(__WIIU__) || defined(MDKR_NULL_RENDERER)
+#include "wiiu_gfx.h"             /* GX2 screen size; ProcUI on the Wii U */
 #endif
 #ifdef MDKR_APP
 #include "host_window.h"          /* app-shell window/device handoff */
@@ -1051,6 +1051,8 @@ static int sdl_should_start_fullscreen(void) {
 int platform_sdl_surface_presentable(void) {
 #if defined(__EMSCRIPTEN__)
     return 1;
+#elif defined(MDKR_NULL_RENDERER)
+    return 1;
 #elif defined(__WIIU__)
     /* No SDL window: the screen is owned by wiiu_gfx.c. It can't be drawn to
      * while the HOME menu has it. */
@@ -1112,7 +1114,7 @@ int platform_sdl_init(void) {
                 "an automatic fallback.\n");
         return -1;
     }
-#ifdef __WIIU__
+#if defined(__WIIU__) || defined(MDKR_NULL_RENDERER)
     /* SDL is only used for controllers here (and audio, opened elsewhere).
      * Its Wii U video driver would set up GX2 itself, which gfx_gx2.c does. */
     if (SDL_WasInit(SDL_INIT_GAMECONTROLLER) == 0 &&
@@ -4163,7 +4165,10 @@ static void sdl_gl_resource_heartbeat(const char *phase, int force) {
 }
 
 void platform_sdl_present(void) {
-#ifdef __WIIU__
+#if defined(MDKR_NULL_RENDERER)
+    g_surfaceFrameCounter++;
+    return;
+#elif defined(__WIIU__)
     {
         const uint64_t wait_start = gfx_dkr_wait_begin();
         wiiu_gfx_present();
@@ -4817,6 +4822,15 @@ static uint64_t pace_sleep_until_impl(uint64_t target_ns) {
      * millisecond Windows uses; sched_yield keeps it polite.
      */
 #define PACE_POSIX_SPIN_NS UINT64_C(1000000)
+#ifdef __WIIU__
+    /* wut's nanosleep() writes the remaining time through its second argument
+     * without checking it for NULL; passing NULL crashes on the console (found
+     * by the Perfect Dark Wii U port). Give it somewhere to write. */
+    struct timespec pace_rem_unused;
+#define PACE_NANOSLEEP_REM (&pace_rem_unused)
+#else
+#define PACE_NANOSLEEP_REM NULL
+#endif
     while (now < target_ns) {
         uint64_t rem = target_ns - now;
         if (rem <= PACE_POSIX_SPIN_NS) {
@@ -4827,7 +4841,7 @@ static uint64_t pace_sleep_until_impl(uint64_t target_ns) {
             struct timespec req;
             req.tv_sec = 0;
             req.tv_nsec = 100000; /* 100 us */
-            nanosleep(&req, NULL);
+            nanosleep(&req, PACE_NANOSLEEP_REM);
             now = pace_host_ns();
             continue;
         }
@@ -4836,7 +4850,7 @@ static uint64_t pace_sleep_until_impl(uint64_t target_ns) {
             struct timespec req;
             req.tv_sec  = (time_t)(coarse / 1000000000ULL);
             req.tv_nsec = (long)(coarse % 1000000000ULL);
-            nanosleep(&req, NULL);
+            nanosleep(&req, PACE_NANOSLEEP_REM);
         }
         now = pace_host_ns();
     }
@@ -5471,7 +5485,7 @@ unsigned platform_present_display_rate(void) {
     }
 #if defined(__EMSCRIPTEN__)
     return 0u; /* measured directly from requestAnimationFrame timestamps */
-#elif defined(__WIIU__)
+#elif defined(__WIIU__) || defined(MDKR_NULL_RENDERER)
     return 60u; /* GX2 swaps on the TV/GamePad's 60 Hz vsync */
 #else
     SDL_DisplayMode mode;

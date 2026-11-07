@@ -145,10 +145,12 @@ void audio_init(OSSched *sc) {
     gSoundCount = gSoundTableSize / sizeof(SoundData);
     /* SoundData.soundBite (the ALInstrument sound index) and .range are u16 and
      * big-endian in ROM; the sfx players and spatial audio read them directly. */
+#if !(defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__) /* little-endian host only */
     for (i = 0; i < gSoundCount; i++) {
         gSoundTable[i].soundBite = (u16) ((gSoundTable[i].soundBite << 8) | (gSoundTable[i].soundBite >> 8));
         gSoundTable[i].range = (u16) ((gSoundTable[i].range << 8) | (gSoundTable[i].range >> 8));
     }
+#endif
 
     gSeqSoundTableSize = addrPtr[ASSET_AUDIO_6] - addrPtr[ASSET_AUDIO_5];
     gSeqSoundTable = (MusicData *) mempool_alloc_safe(gSeqSoundTableSize, COLOUR_TAG_CYAN);
@@ -1702,6 +1704,7 @@ void music_sequence_init(ALCSPlayer *seqp, void *sequence, u8 *seqID, ALCSeq *se
          * each track and compute qnpt, so byte-swap the 68-byte header in place.
          * The MIDI event stream itself is byte-oriented (running status + VLQ
          * delta times assembled byte-by-byte) and needs no swap. */
+#if !(defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__) /* little-endian host only */
         {
             u32 *hdr = (u32 *) sequence;
             s32 w;
@@ -1711,6 +1714,7 @@ void music_sequence_init(ALCSPlayer *seqp, void *sequence, u8 *seqID, ALCSeq *se
                          ((v >> 8) & 0xFF00) | ((v >> 24) & 0xFF);
             }
         }
+#endif
 #endif
         alCSeqNew(seq, sequence);
         alCSPSetSeq(seqp, seq);

@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 project(mdkr64 C)
-# Wii U (devkitPro toolchain): a separate, smaller build definition.
-if(NINTENDO_WIIU)
+# Wii U (devkitPro toolchain), and its big-endian Linux test build: a
+# separate, smaller build definition.
+if(NINTENDO_WIIU OR MDKR_BE_TEST)
     include(${CMAKE_SOURCE_DIR}/cmake/wiiu.cmake)
     return()
 endif()

@@ -18,7 +18,17 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
-find_package(SDL2 REQUIRED)
+# MDKR_BE_TEST: the same program built for 32-bit big-endian PowerPC Linux
+# and run under qemu, with a renderer that draws nothing. It checks that the
+# game and the renderer front end work on a big-endian, 32-bit CPU like the
+# Wii U's, using a real ROM, without needing a console. SDL2 headers come from
+# the host and SDL itself is replaced by small stand-ins (sdl_stub.c).
+# See docs/wiiu/big-endian-test.md.
+option(MDKR_BE_TEST "Build the big-endian Linux test program instead" OFF)
+
+if(NOT MDKR_BE_TEST)
+    find_package(SDL2 REQUIRED)
+endif()
 
 file(GLOB GAME_SOURCES CONFIGURE_DEPENDS
     ${CMAKE_SOURCE_DIR}/game/src/*.c
@@ -41,7 +51,14 @@ list(REMOVE_ITEM FAST3D_SOURCES
     ${CMAKE_SOURCE_DIR}/platform/fast3d/gfx_webgpu_surface_policy.c
     ${CMAKE_SOURCE_DIR}/platform/fast3d/gfx_webgpu_shader.c)
 
-file(GLOB WIIU_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/platform/wiiu/*.c)
+if(MDKR_BE_TEST)
+    file(GLOB WIIU_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/platform/wiiu/betest/*.c)
+    list(APPEND WIIU_SOURCES
+        ${CMAKE_SOURCE_DIR}/platform/wiiu/gfx_character_text_stub.c
+        ${CMAKE_SOURCE_DIR}/platform/wiiu/gfx_opengl_stubs.c)
+else()
+    file(GLOB WIIU_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/platform/wiiu/*.c)
+endif()
 
 set(WIIU_THIRD_PARTY_SOURCES
     ${CMAKE_SOURCE_DIR}/lib/stb/stb_image_impl.c
@@ -101,6 +118,17 @@ target_compile_options(${MDKR_TARGET} PRIVATE
     -Wno-int-conversion
     -Wno-implicit-function-declaration
     -Werror=return-type)
+
+if(MDKR_BE_TEST)
+    target_compile_definitions(${MDKR_TARGET} PRIVATE MDKR_NULL_RENDERER=1
+        SDL_DISABLE_MMINTRIN_H SDL_DISABLE_XMMINTRIN_H SDL_DISABLE_EMMINTRIN_H
+        SDL_DISABLE_PMMINTRIN_H SDL_DISABLE_IMMINTRIN_H SDL_DISABLE_ARM_NEON_H)
+    target_include_directories(${MDKR_TARGET} PRIVATE
+        ${CMAKE_BINARY_DIR}/sdl_config
+        ${MDKR_BE_TEST_SDL_INCLUDE})
+    target_link_libraries(${MDKR_TARGET} PRIVATE m pthread)
+    return()
+endif()
 
 target_link_libraries(${MDKR_TARGET} PRIVATE SDL2::SDL2 m)
 

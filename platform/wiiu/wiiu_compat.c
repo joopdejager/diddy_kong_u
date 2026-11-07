@@ -32,18 +32,4 @@ int flock(int fd, int operation) {
     return 0;
 }
 
-/* The renderer front end asks the GL back end two questions directly. The
- * Wii U uses GX2 (gfx_gx2.c), so give the answers that mean "no limit beyond
- * the framebuffer" and "no captured frame". */
-int gfx_opengl_max_offscreen_dim(void) {
-    return 4096;
-}
-
-bool gfx_opengl_copy_captured_frame(int width, int height, uint8_t *rgb_out) {
-    (void)width;
-    (void)height;
-    (void)rgb_out;
-    return false;
-}
-
 #endif

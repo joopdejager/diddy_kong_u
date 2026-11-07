@@ -338,7 +338,13 @@ void *dkr_arena_init(uint32_t size) {
      * the arena ABOVE the 256 MB segment ceiling so segment tokens always fall
      * through to the segment table and arena addresses (>= 0x10000000) never look
      * like a segment token — no change to the shared resolver. */
+#if defined(__WIIU__)
+    /* Every Wii U heap address is already >= 0x10000000 (MEM2 starts there),
+     * so the arena can't collide with segment tokens; a 256 MB alignment would
+     * only make the allocation harder to satisfy. */
+#else
     if (align < 0x10000000u) align = 0x10000000u;
+#endif
 #endif
     void *p = NULL;
 #ifdef _WIN32
