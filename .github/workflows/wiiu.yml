@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     container: devkitpro/devkitppc:latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Configure
         run: cmake -DCMAKE_TOOLCHAIN_FILE="$DEVKITPRO/cmake/WiiU.cmake" -DCMAKE_BUILD_TYPE=Release -Bbuild-wiiu .
       - name: Build
@@ -20,7 +20,7 @@ jobs:
           mkdir -p out/wiiu/apps/dkr
           cp build-wiiu/mdkr64.wuhb out/wiiu/apps/dkr.wuhb
           echo "Put your Diddy Kong Racing ROM here as dkr.z64" > out/wiiu/apps/dkr/put_your_rom_here.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dkr-wiiu
           path: out/
@@ -30,7 +30,7 @@ jobs:
     # only compiled and started, not run through a race).
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install cross compiler and qemu
         run: sudo apt-get update && sudo apt-get install -y gcc-powerpc-linux-gnu qemu-user libsdl2-dev cmake
       - name: Build and start
