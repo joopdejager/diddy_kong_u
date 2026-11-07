@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Recorded packaged-artifact sizes for the release lanes, with generous regression ceilings. Evidence for the Phone Party GA exit list, not a size budget.",
+  "ceilingRule": "max(bytes * 1.5, bytes + 8 MiB), rounded up to the next MiB",
+  "rebaseline": "python3 tests/check_binary_size_evidence.py --record [--lane <lane>] on a machine that just built that lane, then commit this file",
+  "webLaneNote": "dist/web/*.wasm is deliberately not listed: tools/web/build_web.sh enforces a hard release-blocking byte budget and .github/workflows/web-demo.yml re-checks it independently.",
+  "recordedOn": "2026-10-07",
+  "recordedCommit": "32e2a8c2",
+  "artifacts": [
+    {
+      "name": "linux-tarball",
+      "lane": "linux",
+      "pattern": "dist/Golden-Balloon-*-linux-x86_64.tar.gz",
+      "kind": "file",
+      "producedBy": "tools/package_linux_appimage.sh",
+      "bytes": 42883458,
+      "ceiling": 65011712,
+      "recordedOn": "2026-10-07",
+      "recordedCommit": "32e2a8c2",
+      "recordedFrom": "dist/Golden-Balloon-1.8.0-linux-x86_64.tar.gz"
+    },
+    {
+      "name": "linux-appimage",
+      "lane": "linux",
+      "pattern": "dist/Golden-Balloon-*-linux-x86_64.AppImage",
+      "kind": "file",
+      "producedBy": "tools/package_linux_appimage.sh",
+      "bytes": 42519032,
+      "ceiling": 63963136,
+      "recordedOn": "2026-10-07",
+      "recordedCommit": "32e2a8c2",
+      "recordedFrom": "dist/Golden-Balloon-1.8.0-linux-x86_64.AppImage"
+    },
+    {
+      "name": "windows-zip",
+      "lane": "windows",
+      "pattern": "dist/Golden-Balloon-*-windows-x64.zip",
+      "kind": "file",
+      "producedBy": "tools/package_windows_zip.sh",
+      "bytes": 31883842,
+      "ceiling": 48234496,
+      "recordedOn": "2026-10-07",
+      "recordedCommit": "32e2a8c2",
+      "recordedFrom": "dist/Golden-Balloon-1.8.0-windows-x64.zip"
+    },
+    {
+      "name": "macos-app-bundle",
+      "lane": "macos",
+      "pattern": "dist/Golden Balloon.app",
+      "kind": "bundle",
+      "producedBy": "macos/Scripts/build_app_bundle.sh",
+      "bytes": 42646658,
+      "ceiling": 65011712,
+      "recordedOn": "2026-10-07",
+      "recordedCommit": "32e2a8c2",
+      "recordedFrom": "dist/Golden Balloon.app"
+    },
+    {
+      "name": "macos-app-executable",
+      "lane": "macos",
+      "pattern": "dist/Golden Balloon.app/Contents/MacOS/mdkr64",
+      "kind": "file",
+      "producedBy": "macos/Scripts/build_app_bundle.sh",
+      "bytes": 22563152,
+      "ceiling": 34603008,
+      "recordedOn": "2026-10-07",
+      "recordedCommit": "32e2a8c2",
+      "recordedFrom": "dist/Golden Balloon.app/Contents/MacOS/mdkr64"
+    },
+    {
+      "name": "macos-dmg-unsigned",
+      "lane": "macos",
+      "pattern": "dist/Golden-Balloon-*-macos-arm64-unsigned.dmg",
+      "kind": "file",
+      "producedBy": "macos/Scripts/create_dmg.sh",
+      "bytes": 24607444,
+      "ceiling": 37748736,
+      "recordedOn": "2026-10-07",
+      "recordedCommit": "32e2a8c2",
+      "recordedFrom": "dist/Golden-Balloon-1.8.0-macos-arm64-unsigned.dmg"
+    },
+    {
+      "name": "macos-dmg-notarized",
+      "lane": "macos-signed",
+      "pattern": "dist/Golden-Balloon-*-macos-arm64-signed-notarized.dmg",
+      "kind": "file",
+      "producedBy": "macos/Scripts/create_dmg.sh with trusted_signing",
+      "bytes": null,
+      "ceiling": null,
+      "recordedOn": null,
+      "recordedCommit": null,
+      "recordedFrom": null
+    }
+  ]
+}

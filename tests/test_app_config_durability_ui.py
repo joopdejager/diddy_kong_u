@@ -1,0 +1,105 @@
+#!/usr/bin/env python3
+"""Keep launcher preference durability outcomes honest at every UI boundary."""
+
+from pathlib import Path
+import re
+import sys
+
+
+ROOT = Path(__file__).resolve().parent.parent
+HEADER = (ROOT / "platform" / "app" / "app_config.h").read_text(encoding="utf-8")
+SETTINGS = (ROOT / "platform" / "app" / "ui_settings.cpp").read_text(encoding="utf-8")
+ROM = (ROOT / "platform" / "app" / "ui_rom.cpp").read_text(encoding="utf-8")
+
+
+def require(condition: bool, message: str) -> None:
+    if not condition:
+        raise AssertionError(message)
+
+
+def main() -> int:
+    require("enum class PersistResult" in HEADER,
+            "AppConfig persistence must expose a typed tri-state result")
+    for outcome in ("Failed", "Durable", "DurabilityUnconfirmed"):
+        require(re.search(rf"\b{outcome}\b", HEADER) is not None,
+                f"AppConfig result is missing {outcome}")
+    require("persistResultApplied" in HEADER,
+            "visible-but-unconfirmed writes need one shared applied predicate")
+
+    # Every ordinary shell-preference save path in this settings unit must
+    # accept a visible-but-unconfirmed write through the shared applied
+    # predicate: the initial UI-scale commit, its Retry action, and the
+    # menu-button combo (drawMenuToggleButton). A fourth path added without
+    # updating this count is a path someone wrote without deciding its
+    # durability story. Permanent character cleanup is deliberately NOT one of
+    # them: it lives in the idempotent cleanup-journal reconciler, and its
+    # pre-mutation marker and final removal must be confirmed durable before
+    # the file transaction can advance.
+    require(SETTINGS.count("AppConfig::persistResultApplied(persist)") == 3,
+            "all three ordinary settings-panel save paths must accept visible "
+            "unconfirmed writes")
+    require("forgetCharacterPackagePreferences(id)" in SETTINGS and
+            "preferences == AppConfig::PersistResult::Durable" in SETTINGS and
+            "character_workshop_cleanup_pending" in SETTINGS and
+            "mdkr_modern_character_reconcile_removal_coordinated" in SETTINGS and
+            "mdkr_modern_character_remove_installed_coordinated" in SETTINGS and
+            "commitCharacterPackageCleanup" in SETTINGS and
+            "differentGeneration" in SETTINGS and
+            "sourceDigest" in SETTINGS,
+            "permanent character deletion must durably reconcile its "
+            "native quarantine and package-owned preference cleanup under "
+            "one generation-bound cross-process lifecycle boundary")
+    require("g_characterRegistryInventoryAvailable" in SETTINGS and
+            "destructive recovery and deletion remain disabled" in SETTINGS and
+            "record.present" in SETTINGS,
+            "cleanup recovery must distinguish an unreadable inventory and "
+            "surface malformed durable markers without touching packages")
+    require(SETTINGS.count("PersistResult::DurabilityUnconfirmed") >= 2,
+            "both UI-scale save paths must distinguish durability uncertainty")
+    # Pin the CLAIM, not the sentence. This assertion used to pin exact prose,
+    # which is why improving one string was a multi-file change and why the
+    # slop survived (docs/CAMPAIGN_FAITHFUL_ENHANCED.md section 4). What must
+    # be true is that the warning says the scale WAS applied and that the write
+    # was NOT confirmed -- both halves, in whatever words.
+    for fragment in ("UI scale applied", "could not confirm"):
+        require(fragment in SETTINGS,
+                f"UI-scale warning must still say {fragment!r}")
+    # Same claim honesty for the menu-button row: applied, but unconfirmed --
+    # and its failure copy must say the value did NOT change, because
+    # AppConfig only promotes the in-memory value once the write applied.
+    require("Menu button applied" in SETTINGS,
+            "menu-button warning must say the choice was applied")
+    require("could not be saved and was not" in SETTINGS,
+            "menu-button failure copy must say the value did not change")
+
+    # A freshly validated replacement and Forget both act on a path only once
+    # it was applied. Retry deliberately re-enters that same validation and
+    # replacement transaction, so it cannot promote stale cached identity.
+    # An unconfirmed replacement must remain active with a natural restart
+    # warning; it must never use the old failure path claiming nothing changed.
+    require(ROM.count("AppConfig::persistResultApplied(persist)") == 2,
+            "validated ROM replacement and Forget must share applied-result "
+            "handling")
+    require("BrandPrimaryButton(\"Retry Save\"" in ROM and
+            "retryCandidatePersistence" in ROM and
+            "const std::string candidatePath = s.romCandidatePath;" in ROM and
+            "clearCandidateFeedback(s);" in ROM and
+            "requestValidation(s, ValidationPurpose::Selection, candidatePath);" in ROM,
+            "a retained replacement must be revalidated before Retry can "
+            "persist or promote it")
+    require("ROM path applied, but was not confirmed written to disk" in ROM,
+            "ROM replacement must surface durability uncertainty after activation")
+    require("ROM path forgotten for this session, but storage durability was not " in ROM,
+            "Forget must acknowledge its visible result when durability is uncertain")
+    require(not re.search(r"if\s*\(!\s*AppConfig::setAndSave", ROM + SETTINGS),
+            "no UI path may collapse AppConfig's tri-state result into bool")
+    print("app config durability UI contract passed")
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except AssertionError as error:
+        print(f"FAIL: {error}", file=sys.stderr)
+        raise SystemExit(1)
