@@ -65,13 +65,20 @@ The input scripts are Golden Balloon's test routes (`tests/input_scripts/`).
 
 ## Results (US 1.1 ROM)
 
-| Route | Frames | Result |
+All four routes below **pass**: on every frame the racer line (position,
+race clock, checkpoint, lap, finish), the renderer's draw and triangle counts
+and the set of colour-combiner shaders requested are identical between x86-64
+and big-endian PowerPC, and the GX2 vertex-layout check never fails.
+
+| Route | Frames | Race frames compared |
 |---|---|---|
-| Boot to title and attract mode | 600 | Runs clean |
-| `nav_to_time_trial_race` + autopilot (title → menus → Time Trial race, AI finishes) | 7500 | Racer position, clock, checkpoint and lap identical to x86-64 on all 4880 race frames; renderer draw/triangle counts identical; vertex layout matched all 1,951,428 draws |
-| `race_full_3lap` + autopilot (8-racer race, 3 laps) | 14000 | see below |
-| `race_2p_split` + autopilot (2-player split screen) | 9000 | see below |
-| `adventure_race_loop` (hub → race → back to hub) | 17000 | see below |
+| `nav_to_time_trial_race` + autopilot: title, menus, solo Time Trial, AI finishes | 7500 | 4880 |
+| `race_full_3lap` + autopilot: 8-racer race, 3 laps | 14000 | 11379 |
+| `race_2p_split` + autopilot: 2-player split screen | 9000 | 6529 |
+| `adventure_race_loop`: Adventure hub, drive to a door, race, back to the hub | 17000 | 11133 |
+
+(Texture and shader *creation* totals are not compared: the texture cache is
+keyed on host memory addresses, which differ between 64- and 32-bit builds.)
 
 Under qemu the PowerPC build runs about 60 frames per second of game time
 on a 4-core cloud machine, so these take a few minutes each.
@@ -82,6 +89,7 @@ on a 4-core cloud machine, so these take a few minutes each.
 |---|---|---|
 | `[FATAL] SHIELD_DATA[0]: scale=-4.29e8 ... looks byte-reversed` at boot | The miscellaneous-asset tables (`objects.c`, `dkr_misc_swap_*`) were swapped unconditionally | Skip the swap on big-endian hosts |
 | Crash in `cseq_track_byte` the first time music started | The music sequence header swap (`audio.c`) was unconditional, so track offsets pointed outside the sequence | Little-endian only |
+| Shaders with fog the x86 build never asked for | Static display lists (the RSP/RDP init lists) called by raw address were skipped: on 32-bit hosts the address decoder (`dkr_resolve`) assumed wasm's low addresses, but on PPC Linux and the Wii U program data sits at `0x10000000`+, which it mistook for an N64 segment token. Found by tracing every display-list command on both builds and diffing. | Raw tokens at or above `0x10000000` are host pointers on native 32-bit hosts |
 | (found by reading, same pattern) | Sound table (`audio.c`), BSP tree (`tracks.c`), game text table (`game_text.c`), object-map body fields (`objects.c`) | Little-endian only |
 
-Each fix is a `#if` on `__BYTE_ORDER__`, so the desktop build is unchanged.
+Each fix is behind `__BYTE_ORDER__`, `__WIIU__` or a 32-bit-pointer check, so the desktop build is unchanged.

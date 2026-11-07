@@ -77,8 +77,8 @@ push (`.github/workflows/wiiu.yml`, artifact `dkr-wiiu`).
 | Area | State |
 |---|---|
 | Builds as `.rpx` / `.wuhb` | Yes |
-| Game logic on big-endian 32-bit CPU | Verified under qemu with a US 1.1 ROM: boots, menus, a full Time Trial race driven by the game's AI; racer position matches the x86-64 build exactly, frame by frame ([big-endian-test.md](big-endian-test.md)) |
-| Renderer front end on big-endian | Runs in the same test; every draw call's vertex layout matches what the GX2 back end expects |
+| Game logic on big-endian 32-bit CPU | Verified under qemu with a US 1.1 ROM on four routes (Time Trial, 8-racer 3-lap race, 2-player split screen, Adventure hub → race → hub): racer state identical to the x86-64 build on every frame ([big-endian-test.md](big-endian-test.md)) |
+| Renderer front end on big-endian | Same test: per-frame draw/triangle counts and combiner shaders identical to x86-64; every draw call's vertex layout matches what the GX2 back end expects |
 | GX2 back end (`platform/wiiu/gfx_gx2.c`) | Written, compiles, untested on hardware |
 | Controllers | GamePad and Pro Controller through SDL2's Wii U joystick driver, using Golden Balloon's standard mapping |
 | Audio | SDL2's Wii U audio, same code path as desktop |
