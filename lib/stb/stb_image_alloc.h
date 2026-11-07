@@ -75,6 +75,10 @@ static inline void *mdkr_stbi_realloc(void *pointer, size_t size) {
  * unit that instantiates stb_image. */
 #if defined(_MSC_VER)
 #define MDKR_STBI_THREAD_LOCAL __declspec(thread)
+#elif defined(__WIIU__)
+/* The Wii U's executable format (RPX) has no thread-local storage. The limit
+ * is only set around a decode, so a plain static is a safe stand-in. */
+#define MDKR_STBI_THREAD_LOCAL
 #else
 #define MDKR_STBI_THREAD_LOCAL _Thread_local
 #endif

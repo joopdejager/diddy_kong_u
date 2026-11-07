@@ -66,7 +66,7 @@ void mdkr_host_sched_sample(MdkrHostSchedSample *out) {
     }
 }
 
-#elif !defined(_WIN32) && !defined(__EMSCRIPTEN__)
+#elif !defined(_WIN32) && !defined(__EMSCRIPTEN__) && !defined(__WIIU__)
 #include <sys/resource.h>
 
 void mdkr_host_sched_sample(MdkrHostSchedSample *out) {

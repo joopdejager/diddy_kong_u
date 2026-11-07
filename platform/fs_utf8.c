@@ -1239,8 +1239,22 @@ int mdkr_directory_list_utf8(const char *path, MdkrDirectoryVisit visit,
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
             continue;
         }
+#ifdef __WIIU__
+        /* wut's C library has no fstatat/dirfd: stat the joined path. */
+        {
+            char joined[4096];
+            int n = snprintf(joined, sizeof(joined), "%s/%s", path, entry->d_name);
+            if (n < 0 || (size_t)n >= sizeof(joined) || stat(joined, &status) != 0) {
+                if (errno == ENOENT) continue;
+                result = 1;
+                break;
+            }
+        }
+        if (0) {
+#else
         if (fstatat(dirfd(directory), entry->d_name, &status,
                     AT_SYMLINK_NOFOLLOW) != 0) {
+#endif
             if (errno == ENOENT) continue; /* removed while listing */
             result = 1;
             break;

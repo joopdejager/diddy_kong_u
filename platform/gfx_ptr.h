@@ -76,6 +76,10 @@ extern uint32_t  gfx_ptr_high_water;  /* session-long OCCUPIED high-water */
  * registry globals (gfx_pc.c; test stub in test_gfx_ptr_registry.c). */
 #if defined(_MSC_VER)
 #define GFX_PTR_TLS __declspec(thread)
+#elif defined(__WIIU__)
+/* RPX executables have no thread-local storage. The only writer is the
+ * opt-in audio-synth worker, which the Wii U build never starts. */
+#define GFX_PTR_TLS
 #else
 #define GFX_PTR_TLS __thread
 #endif

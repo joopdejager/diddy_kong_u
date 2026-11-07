@@ -18,7 +18,7 @@
 #endif
 #ifndef __EMSCRIPTEN__
 #include <signal.h>
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__WIIU__)
 #include <execinfo.h>       /* backtrace() — glibc/macOS only; absent on wasm AND Windows */
 #endif
 #endif
@@ -130,6 +130,10 @@ static void mdkr_crash_handler(int sig) {
         n = snprintf(line, sizeof(line), "  #%u %p\n", (unsigned) i, bt[i]);
         if (n > 0) mdkr_crash_write(line, (unsigned) n);
     }
+#elif defined(__WIIU__)
+    /* No backtrace() on the Wii U; platform/wiiu/wiiu_crash.c handles faults. */
+    (void)bt;
+    fprintf(stderr, "\n[CRASH] signal %d\n", sig);
 #else
     int n = backtrace(bt, 40);
     fprintf(stderr, "\n[CRASH] signal %d - backtrace (%d frames):\n", sig, n);
@@ -160,7 +164,9 @@ extern void camera_obstruction_runtime_install_config_apply(void);
  * (platform/fast3d/gfx_opengl.c). Forward-declared opaquely to avoid pulling the
  * full fast3d/PR headers into the entry point. */
 struct GfxRenderingAPI;
-#ifndef __EMSCRIPTEN__
+#ifdef __WIIU__
+extern struct GfxRenderingAPI gfx_gx2_api;      /* platform/wiiu/gfx_gx2.c */
+#elif !defined(__EMSCRIPTEN__)
 extern struct GfxRenderingAPI gfx_opengl_api;   /* GL backend — desktop only */
 #endif
 #ifdef MDKR_WEBGPU_BACKEND
@@ -223,6 +229,11 @@ static void print_usage(const char *program) {
 #ifdef MDKR_APP
 int mdkr64_headless_main(int argc, char **argv);
 int mdkr64_headless_main(int argc, char **argv) {
+#elif defined(__WIIU__)
+/* platform/wiiu/wiiu_main.c owns main(): it moves to a bigger stack and
+ * points the game at the SD card before calling this. */
+int mdkr64_wiiu_main(int argc, char **argv);
+int mdkr64_wiiu_main(int argc, char **argv) {
 #else
 int main(int argc, char **argv) {
 #endif
@@ -481,6 +492,8 @@ int main(int argc, char **argv) {
 #ifdef __EMSCRIPTEN__
     /* Web is WebGPU-only (no GL backend compiled in the wasm binary). */
     struct GfxRenderingAPI *rapi = &gfx_webgpu_api;
+#elif defined(__WIIU__)
+    struct GfxRenderingAPI *rapi = &gfx_gx2_api;
 #else
     struct GfxRenderingAPI *rapi = &gfx_opengl_api;
 #ifdef MDKR_WEBGPU_BACKEND

@@ -1,5 +1,10 @@
 cmake_minimum_required(VERSION 3.16)
 project(mdkr64 C)
+# Wii U (devkitPro toolchain): a separate, smaller build definition.
+if(NINTENDO_WIIU)
+    include(${CMAKE_SOURCE_DIR}/cmake/wiiu.cmake)
+    return()
+endif()
 # Editors and clangd read build-rel/compile_commands.json (see .clangd). Without
 # it every include resolves against the compiler's bare default search path and
 # the editor reports missing headers that the real build finds.

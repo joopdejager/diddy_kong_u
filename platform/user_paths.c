@@ -769,6 +769,10 @@ static int resolve_executable_directory(void) {
     if (s_exe_dir[0] != '\0') {
         return 1;
     }
+#ifdef __WIIU__
+    /* The Wii U app keeps everything in its SD card folder. */
+    return path_copy(s_exe_dir, sizeof(s_exe_dir), MDKR_WIIU_APP_DIR);
+#endif
     /* An AppImage executes from a read-only SquashFS mount, so /proc/self/exe
      * (mdkr_running_executable_path_utf8) resolves inside /tmp/.mount_XXXX rather
      * than to the .AppImage file the player can see and write beside. The
@@ -803,6 +807,14 @@ static void ensure_portable_resolved(void) {
         return;
     }
     s_portable_resolved = 1;
+#ifdef __WIIU__
+    /* Always "portable" on the Wii U: settings and saves go in the app's SD
+     * card folder, there is no per-user preference directory. */
+    if (resolve_executable_directory()) {
+        s_portable = 1;
+        return;
+    }
+#endif
     if (resolve_executable_directory() &&
         path_join(marker, sizeof(marker), s_exe_dir, "portable.txt") &&
         path_is_regular(marker)) {

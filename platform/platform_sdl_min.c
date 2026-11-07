@@ -179,6 +179,9 @@ uint64_t platform_perf_monotonic_ns(void) {
 #include "sprite_models.h"
 #include "mdkr_bounds.h"
 #include "gfx_ptr.h"
+#ifdef __WIIU__
+#include "wiiu_gfx.h"             /* GX2 screen + ProcUI (HOME menu) */
+#endif
 #ifdef MDKR_APP
 #include "host_window.h"          /* app-shell window/device handoff */
 #endif
@@ -1046,8 +1049,12 @@ static int sdl_should_start_fullscreen(void) {
 }
 
 int platform_sdl_surface_presentable(void) {
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__)
     return 1;
+#elif defined(__WIIU__)
+    /* No SDL window: the screen is owned by wiiu_gfx.c. It can't be drawn to
+     * while the HOME menu has it. */
+    return wiiu_gfx_has_foreground() ? 1 : 0;
 #else
     if (s_window == NULL) {
         return 0;
@@ -1105,12 +1112,28 @@ int platform_sdl_init(void) {
                 "an automatic fallback.\n");
         return -1;
     }
+#ifdef __WIIU__
+    /* SDL is only used for controllers here (and audio, opened elsewhere).
+     * Its Wii U video driver would set up GX2 itself, which gfx_gx2.c does. */
+    if (SDL_WasInit(SDL_INIT_GAMECONTROLLER) == 0 &&
+        SDL_Init(SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER) != 0) {
+        fprintf(stderr, "[SDL] init failed: %s\n", SDL_GetError());
+        return -1;
+    }
+    s_sdlReady = 1;
+    s_initialWindowWidth = WIIU_FB_WIDTH;
+    s_initialWindowHeight = WIIU_FB_HEIGHT;
+    printf("[SDL] Wii U: controllers ready, screen is GX2 (%dx%d)\n",
+           WIIU_FB_WIDTH, WIIU_FB_HEIGHT);
+    return 0;
+#else
     if (SDL_WasInit(SDL_INIT_VIDEO) == 0 &&
         SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER) != 0) {
         fprintf(stderr, "[SDL] init failed: %s\n", SDL_GetError());
         return -1;
     }
     s_sdlReady = 1;
+#endif
 #if defined(__APPLE__) && !defined(__EMSCRIPTEN__)
     /* Process-global and window-agnostic, so it belongs at the COMMON init:
      * the adopted-window path (launcher creates the window, engine adopts)
@@ -3977,6 +4000,13 @@ void platform_input_pump(void) {
      * discrete SDL event. The queue coalesces unchanged/analog-only samples. */
     input_capture_live(target_tick);
 
+#ifdef __WIIU__
+    /* ProcUI: runs the HOME menu (blocking while it is open) and reports when
+     * the system wants the app to close. */
+    if (!wiiu_gfx_process()) {
+        s_quitRequested = 1;
+    }
+#endif
     if (s_quitRequested) {
         platform_request_exit(0);
     }
@@ -4133,6 +4163,15 @@ static void sdl_gl_resource_heartbeat(const char *phase, int force) {
 }
 
 void platform_sdl_present(void) {
+#ifdef __WIIU__
+    {
+        const uint64_t wait_start = gfx_dkr_wait_begin();
+        wiiu_gfx_present();
+        gfx_dkr_wait_end(GFX_DKR_WAIT_SWAP, wait_start);
+    }
+    g_surfaceFrameCounter++;
+    return;
+#endif
     if (s_glReady) {
         /* The F3DDKR backend clears + renders into the default framebuffer each
          * frame (gfx_opengl_start_frame), so present must NOT clear here — doing
@@ -5430,8 +5469,10 @@ unsigned platform_present_display_rate(void) {
     if (s_displaySwitchState == 1 && s_displaySwitchFired) {
         return s_displaySwitchRate;
     }
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__)
     return 0u; /* measured directly from requestAnimationFrame timestamps */
+#elif defined(__WIIU__)
+    return 60u; /* GX2 swaps on the TV/GamePad's 60 Hz vsync */
 #else
     SDL_DisplayMode mode;
     int display = s_window != NULL ? SDL_GetWindowDisplayIndex(s_window) : 0;

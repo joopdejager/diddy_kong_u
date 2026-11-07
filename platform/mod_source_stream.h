@@ -11,7 +11,7 @@
  * directory descriptors elsewhere. Defining MDKR_PACK_PATH_ARM selects the
  * pathname arm on a POSIX host, so the tests of the Windows logic run where
  * the suite runs. */
-#if defined(_WIN32) || defined(MDKR_PACK_PATH_ARM)
+#if defined(_WIN32) || defined(__WIIU__) || defined(MDKR_PACK_PATH_ARM)
 #define MDKR_PACK_BY_PATH 1
 #else
 #define MDKR_PACK_BY_PATH 0

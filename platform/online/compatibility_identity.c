@@ -24,6 +24,8 @@
 #define MDKR_ONLINE_OS_TAG "windows"
 #elif defined(__linux__)
 #define MDKR_ONLINE_OS_TAG "linux"
+#elif defined(__WIIU__)
+#define MDKR_ONLINE_OS_TAG "wiiu" /* online play is not built for the Wii U */
 #else
 #error "online OS tag unmapped for this platform: prove its gameplay \
 determinism domain and add it here (and to the pinned unit vectors) before \
